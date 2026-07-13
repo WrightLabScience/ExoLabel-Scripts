@@ -5,10 +5,20 @@ genome_levels <- c(50,
                    200,
                    400)
 
-PDF_SCALE <- 1.25
-PDF_DIM <- c(height=4.3*PDF_SCALE, width=4.3*1.5*PDF_SCALE)
+PLOT_MAIN <- TRUE # False to plot supplemental
 SOURCE_DIR <- '~'
 
+if(PLOT_MAIN){
+  PDF_SCALE <- 0.65
+  PDF_DIM <- c(height=4.3*PDF_SCALE, width=4.3*3*PDF_SCALE)
+  outfile <- file.path(dirname(SOURCE_DIR), "Figure2_main.pdf")
+} else {
+  PDF_SCALE <- 1.25
+  PDF_DIM <- c(height=4.3*PDF_SCALE, width=4.3*1.5*PDF_SCALE)
+  outfile <- file.path(dirname(SOURCE_DIR), "Figure2_suppl.pdf")
+}
+
+to_print <- character(0L)
 for(i in seq_along(genome_levels)){
   fp <- file.path(SOURCE_DIR, paste0(genome_levels[i], "GenomeSetBlast_v5.RData"))
   if(!file.exists(fp)) stop("File for genome level ", genome_levels[i], " does not exist!")
@@ -19,7 +29,7 @@ for(i in seq_along(genome_levels)){
   to_print <- unique(c(to_print, do.call(rbind, RealData)$Alg))
   #GraphMeans[[i]] <- GraphStats
 }
-outfile <- file.path(SOURCE_DIR, "RealResults_full.pdf")
+
 
 NUM_PLOTS <- length(RealDataResults)
 ynam <- c("avg_PID")
@@ -29,7 +39,7 @@ PLOT_SCALE <- 1L
 
 to_plot <- do.call(rbind, RealData)
 to_print <- unique(to_plot$Alg)
-cols <- c("LabelProp"='#45A649',
+cols <- c("LabelProp"='#E0A608',
           "Speakeasy"='#45A649', # label propagation
           "FastGreedy"='#1E88E5',
           "Louvain05"='#1E88E5',
@@ -48,7 +58,7 @@ cols <- c("LabelProp"='#45A649',
           "MCL I=2"='#E82B70',
           "MCL I=3"='#E82B70',
           "MCL I=4"='#E82B70', # MCLs
-          "Spinglass"='#E0A608') # spinglass
+          "Spinglass"='#E0A608') # spinglass, not used
 
 EL_Cols <- c("#824484", NA, NA)
 ExoLabel_SL <- c(0,25,50,100)
@@ -74,17 +84,30 @@ CATEGORIES <- c("MCL",
                 paste0("ExoLabel A=", sprintf("%.01f", ExoLabel_Atten)),
                 "Louvain", "Leiden", "Walktrap")
 
-pdf(outfile, width=PDF_DIM["width"], height=PDF_DIM["height"], onefile=TRUE)
-#ynam <- c("unweighted", "annot_nmi")
-LAYOUT_MAT <- matrix(c(1,3,2,4,5,6), nrow=2)
-layout(LAYOUT_MAT)
-par(mar=c(2.5,2.5,1.2,0.5)+0.1, mgp=c(1.5,0.5,0))
-xlims <- list(c(5,15),
-              c(5,25),
-              c(5,30),
-              c(5,35))
+if (PLOT_MAIN){
+  pdf(outfile, width=PDF_DIM["width"], height=PDF_DIM["height"], onefile=TRUE)
+  #ynam <- c("unweighted", "annot_nmi")
+  LAYOUT_MAT <- matrix(c(1,2,3), nrow=1)
+  layout(LAYOUT_MAT)
+  par(mar=c(2.5,2.5,1.2,0.5)+0.1, mgp=c(1.5,0.5,0))
+  xlims <- list(c(5,15),
+                c(5,25),
+                c(5,30),
+                c(5,40))
+} else {
+  pdf(outfile, width=PDF_DIM["width"], height=PDF_DIM["height"], onefile=TRUE)
+  #ynam <- c("unweighted", "annot_nmi")
+  LAYOUT_MAT <- matrix(c(1,3,2,4,5,6), nrow=2)
+  layout(LAYOUT_MAT)
+  par(mar=c(2.5,2.5,1.2,0.5)+0.1, mgp=c(1.5,0.5,0))
+  xlims <- list(c(5,15),
+                c(5,25),
+                c(5,30),
+                c(5,40))
+}
 
 all_runtimes <- NULL
+plotted_arrow_yet <- FALSE
 for(j in seq_along(RealDataResults)){
   to_plot <- do.call(rbind, RealDataResults[[j]])
   for(i in seq_along(ynam)){
@@ -103,14 +126,30 @@ for(j in seq_along(RealDataResults)){
     } else {
       all_runtimes <- cbind(all_runtimes, runtimes)
     }
-    plot(y=yv, x=xv,
-         xlab=c("", "Mean Cluster Size")[(j%/%3)+1],
-         ylab=c("", "Mean Within-Cluster PID")[j%%2+1],
-         col=cols, pch=pchs,
-         xlim=xlims[[j]],
-         ylim=c(20,45),
-         yaxt='n',
-         main = paste(genome_levels[j], "Genomes"))
+    if(PLOT_MAIN && j < 4){
+      ## Main plot only includes the 400 genome case
+      next
+    } else if (PLOT_MAIN) {
+      plot(y=yv, x=xv,
+           xlab="Mean Cluster Size",
+           ylab="Mean Within-Cluster PID",
+           col=cols, pch=pchs,
+           #xlim=xlims[[j]],
+           xlim=c(0.8*min(xv),max(xv)),
+           ylim=c(20,45),
+           yaxt='n',
+           main = "Accuracy on 400 Genomes")
+    } else {
+      plot(y=yv, x=xv,
+           xlab=c("", "Mean Cluster Size")[(j%/%3)+1],
+           ylab=c("", "Mean Within-Cluster PID")[j%%2+1],
+           col=cols, pch=pchs,
+           #xlim=xlims[[j]],
+           xlim=c(0.8*min(xv),max(xv)),
+           ylim=c(20,45),
+           yaxt='n',
+           main = paste(genome_levels[j], "Genomes"))
+    }
     axis(2, at=seq(20,44,4), labels = paste0(seq(20,44,4), '%'))
     for(category in CATEGORIES){
       p <- which(grepl(category, to_print))
@@ -118,6 +157,19 @@ for(j in seq_along(RealDataResults)){
       lines(y=yv[p[order(xv[p], yv[p])]], x=xv[p][order(xv[p], yv[p])], col=cat_col, lwd=1)
     }
     points(y=yv, x=xv, col=cols, pch=pchs)
+    if(!plotted_arrow_yet){
+      plotted_arrow_yet <- TRUE
+      abs_arrow_mult <- 0.98
+      yv_max <- 44L
+      xv_max <- xv["DisjointSet"] * abs_arrow_mult
+      arrow_scaling <- c(0.875, 0.9)
+      arrows(x0=xv_max*arrow_scaling[1], x1=xv_max,
+             y0=yv_max*arrow_scaling[2], y1=yv_max,
+             col='#45A649', length=0.05, lwd=2)
+      text(x=xv_max*arrow_scaling[1], y=yv_max*arrow_scaling[2],
+           labels="Better Performance", col='#45A649', font=1, cex=1,
+           srt=0, adj=c(0.65,1.1))
+    }
 
     abline(h=yv["DisjointSet"], v=xv["DisjointSet"], lty=2)
     l_p <- which(pchs==16)
@@ -130,25 +182,51 @@ for(j in seq_along(RealDataResults)){
 pos_disjoint_set <- which(rownames(all_runtimes) == "DisjointSet")
 reorg <- c(seq_len(pos_disjoint_set-1), seq(pos_disjoint_set+1, nrow(all_runtimes)), pos_disjoint_set)
 all_runtimes <- all_runtimes[reorg,]
+# xv <- c(genome_levels, 4422)
+xv <- genome_levels
 pchs <- pchs[reorg]
 cols <- cols[reorg]
 GraphMeans <- do.call(rbind, GraphMeans)
-GraphMeans[4,] <- GraphMeans[4,]*11 ## Temporary until we get fixed data
+#GraphMeans[4,] <- GraphMeans[4,]*11 ## Temporary until we get fixed data
 xtick <- seq(1,14)
 ytick <- seq(0,5)
-plot(y=c(all_runtimes[-nrow(all_runtimes),]), x=rep(GraphMeans[,1], each=nrow(all_runtimes)-1),
-     xlab="Number of Nodes (100,000s)",
+to_include <- c(1,9,10,12,15,17,19,24)
+runtimes <- all_runtimes[to_include,]
+# runtimes <- cbind(runtimes, rep(NA_real_, nrow(runtimes)))
+# runtimes[1,ncol(runtimes)] <- 54831
+to_plot_x <- c(rep(xv, each=nrow(runtimes)), 4422)
+to_plot_y <- c(runtimes, 54831)
+# plot(y=c(runtimes), x=rep(xv, each=nrow(runtimes)),
+plot(y=to_plot_y, x=to_plot_x,
+     xlab="Number of Genomes",
      ylab="Runtime (sec.)",
-     col=cols, pch=pchs,
+     col=cols[to_include], pch=pchs[to_include],
      log='xy',
-     xlim=c(100000*xtick[1], 100000*xtick[length(xtick)]),
+     #xlim=c(100000*xtick[1], 100000*xtick[length(xtick)]),
      ylim=c(10**ytick[1], 10**ytick[length(ytick)]),
-     main = "Runtime", xaxt='n', yaxt='n')
-axis(1, at=1e5*xtick, labels=xtick)
+     main = "Runtime", yaxt='n', xaxt='n')
+#axis(1, at=1e5*xtick, labels=xtick)
+axis(1, at=c(50, 100, 200, 400, 800, 1600, 4400))
 axis(2, at=10**ytick, labels=parse(text=paste0(10, "^", ytick)))
 
-for(i in seq_len(nrow(all_runtimes)-1)){
-  lines(y=all_runtimes[i,], x=GraphMeans[,1], col=cols[i])
+y_line_marks <- c(1, 60, 60*60, 60*60*24, 60*60*24*7)
+y_line_labs <- c("1 sec.", "1 min.", "1 hr.", "1 day", "1 week")
+for(i in seq_along(y_line_marks)){
+  abline(h=y_line_marks[i], lty=2)
+  #text(x=100000, y=y_line_marks[i], labels = y_line_labs[i],
+  text(x=5000, y=y_line_marks[i], labels = y_line_labs[i],
+       adj=c(1,-0.20), font=2)
+}
+
+for(i in seq_len(nrow(runtimes))){
+  yvr <- runtimes[i,]
+  xvr <- xv
+  if(i == 1){
+    yvr <- c(yvr, 54831)
+    xvr <- c(xvr, 4422)
+  }
+  lines(y=yvr, x=xvr, col=cols[to_include][i])
+  points(y=yvr, x=xvr, col=cols[to_include][i], pch=pchs[to_include][i])
 }
 
 plot.new()
